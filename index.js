@@ -37,6 +37,48 @@ async function run() {
         });
 
 
+        app.get('/all-products', async (req, res) => {
+            const size = parseInt(req.query.size);
+            const page = parseInt(req.query.page) - 1; // Page starts from 1, so we adjust here
+            const filter = req.query.filter;
+            const sort = req.query.sort;
+            const search = req.query.search;
+
+            let query = {
+                productName: { $regex: search, $options: 'i' },
+            };
+            if (filter) query.category = filter;
+
+            let options = {};
+            if (sort) options.sort = { price: sort === 'asc' ? 1 : -1 }; // Adjust 'price' to your sort field
+
+            const result = await productCollection
+                .find(query, options)
+                .skip(page * size)
+                .limit(size)
+                .toArray();
+
+            res.send(result);
+        });
+
+
+
+        // Get all products data count from db
+        app.get('/products-count', async (req, res) => {
+            const filter = req.query.filter
+            const search = req.query.search
+            let query = {
+                productName: { $regex: search, $options: 'i' },
+            }
+            if (filter) query.category = filter
+            const count = await productCollection.countDocuments(query)
+
+            res.send({ count })
+        })
+
+
+
+
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
 
