@@ -38,6 +38,7 @@ async function run() {
             const priceRange = req.query.priceRange;
             const sort = req.query.sort;
             const search = req.query.search;
+            const dateSort = req.query.dateSort; 
 
             let query = {
                 productName: { $regex: search, $options: 'i' },
@@ -58,6 +59,11 @@ async function run() {
 
             let options = {};
             if (sort) options.sort = { price: sort === 'asc' ? 1 : -1 };
+
+            // Handle date sorting
+            if (dateSort) {
+                options.sort = { ...options.sort, createdAt: dateSort === 'asc' ? 1 : -1 };
+            }
 
             try {
                 const result = await productCollection
