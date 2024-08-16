@@ -39,27 +39,48 @@ async function run() {
 
         app.get('/all-products', async (req, res) => {
             const size = parseInt(req.query.size);
-            const page = parseInt(req.query.page) - 1; // Page starts from 1, so we adjust here
-            const filter = req.query.filter;
+            const page = parseInt(req.query.page) - 1; 
+            const filter = req.query.filter; // For category
+            const brand = req.query.brand; // For brand
+            const priceRange = req.query.priceRange; // For price range
             const sort = req.query.sort;
             const search = req.query.search;
 
             let query = {
                 productName: { $regex: search, $options: 'i' },
             };
+
+            // Apply filters
             if (filter) query.category = filter;
+            if (brand) query.brandName = brand;
+
+            if (priceRange) {
+                const [minPrice, maxPrice] = priceRange.split('-').map(Number);
+                if (maxPrice) {
+                    query.price = { $gte: minPrice, $lte: maxPrice };
+                } else {
+                    query.price = { $gte: minPrice }; // For range like '300+'
+                }
+            }
 
             let options = {};
             if (sort) options.sort = { price: sort === 'asc' ? 1 : -1 }; // Adjust 'price' to your sort field
 
-            const result = await productCollection
-                .find(query, options)
-                .skip(page * size)
-                .limit(size)
-                .toArray();
+            try {
+                const result = await productCollection
+                    .find(query, options)
+                    .skip(page * size)
+                    .limit(size)
+                    .toArray();
 
-            res.send(result);
+                const count = await productCollection.countDocuments(query);
+
+                res.send({ products: result, count });
+            } catch (error) {
+                res.status(500).send({ error: 'Error fetching products' });
+            }
         });
+
 
 
 
