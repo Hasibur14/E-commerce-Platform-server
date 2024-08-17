@@ -30,53 +30,49 @@ async function run() {
         const productCollection = client.db('primePickDB').collection('products');
 
 
+        // Get all products with optional filtering, sorting, and pagination
         app.get('/all-products', async (req, res) => {
-            const size = parseInt(req.query.size);
-            const page = parseInt(req.query.page) - 1;
-            const search = req.query.search;
-            const filter = req.query.filter;
-            const brand = req.query.brand;
-            const priceRange = req.query.priceRange;
-            const sort = req.query.sort;
-            const dateSort = req.query.dateSort;
-
-            let query = {
-                productName: { $regex: search, $options: 'i' },
-            };
-
-            // Apply filters
-            if (filter) query.category = filter;
-            if (brand) query.brandName = brand;
-
-            if (priceRange) {
-                const [minPrice, maxPrice] = priceRange.split('-').map(Number);
-                if (maxPrice) {
-                    query.price = { $gte: minPrice, $lte: maxPrice };
-                } else {
-                    query.price = { $gte: minPrice };
-                }
-            }
-
-            let options = {};
-            if (sort) options.sort = { price: sort === 'asc' ? 1 : -1 };
-
-            // Handle date sorting
-            if (dateSort) {
-                options.sort = { ...options.sort, createdAt: dateSort === 'asc' ? 1 : -1 };
-            }
-
             try {
-                const result = await productCollection
-                    .find(query, options)
-                    .skip(page * size)
-                    .limit(size)
+                const {
+                    size = 10,
+                    page = 1,
+                    search = '',
+                    filter: category,
+                    brand,
+                    priceRange,
+                    sort = 'asc',
+                    dateSort = 'asc'
+                } = req.query;
+
+                const pageSize = parseInt(size);
+                const pageIndex = parseInt(page) - 1;
+
+                const query = {
+                    productName: { $regex: search, $options: 'i' },
+                    ...(category && { category }),
+                    ...(brand && { brandName: brand }),
+                    ...(priceRange && (() => {
+                        const [minPrice, maxPrice] = priceRange.split('-').map(Number);
+                        return maxPrice ? { price: { $gte: minPrice, $lte: maxPrice } } : { price: { $gte: minPrice } };
+                    })())
+                };
+
+                const sortOptions = {};
+                if (sort) sortOptions.price = sort === 'asc' ? 1 : -1;
+                if (dateSort) sortOptions.createdAt = dateSort === 'asc' ? 1 : -1;
+
+                const products = await productCollection
+                    .find(query)
+                    .sort(sortOptions)
+                    .skip(pageIndex * pageSize)
+                    .limit(pageSize)
                     .toArray();
 
                 const count = await productCollection.countDocuments(query);
-
-                res.send({ products: result, count });
+                res.send({ products, count });
             } catch (error) {
-                res.status(500).send({ error: 'Error fetching products' });
+                console.error('Error fetching products:', error);
+                res.status(500).send({ error: 'Failed to fetch products' });
             }
         });
 
@@ -92,17 +88,12 @@ async function run() {
                     productName: { $regex: search, $options: 'i' },
                 };
 
-                // Apply category filter if provided
                 if (category) {
                     query.category = category;
                 }
-
-                // Apply brand filter if provided
                 if (brand) {
                     query.brandName = brand;
                 }
-
-                // Apply price range filter if provided
                 if (priceRange) {
                     const [minPrice, maxPrice] = priceRange.split('-').map(Number);
                     if (maxPrice) {
@@ -118,8 +109,6 @@ async function run() {
                 res.status(500).send({ error: 'Failed to fetch product count' });
             }
         });
-
-
 
 
 
