@@ -33,12 +33,12 @@ async function run() {
         app.get('/all-products', async (req, res) => {
             const size = parseInt(req.query.size);
             const page = parseInt(req.query.page) - 1;
+            const search = req.query.search;
             const filter = req.query.filter;
             const brand = req.query.brand;
             const priceRange = req.query.priceRange;
             const sort = req.query.sort;
-            const search = req.query.search;
-            const dateSort = req.query.dateSort; 
+            const dateSort = req.query.dateSort;
 
             let query = {
                 productName: { $regex: search, $options: 'i' },
@@ -83,36 +83,39 @@ async function run() {
 
 
 
-        // Get all products data count from db
+
+        // Get all products data count from the database
         app.get('/products-count', async (req, res) => {
-            const filter = req.query.filter; // For category
-            const brand = req.query.brand; // For brand
-            const priceRange = req.query.priceRange; // For price range
-            const search = req.query.search;
-
-            let query = {
-                productName: { $regex: search, $options: 'i' },
-            };
-
-            // Apply filters
-            if (filter) query.category = filter;
-            if (brand) query.brandName = brand;
-
-            if (priceRange) {
-                const [minPrice, maxPrice] = priceRange.split('-').map(Number);
-                if (maxPrice) {
-                    query.price = { $gte: minPrice, $lte: maxPrice };
-                } else {
-                    query.price = { $gte: minPrice };
-                }
-            }
-
             try {
+                const { filter: category, brand, priceRange, search = '' } = req.query;
+                const query = {
+                    productName: { $regex: search, $options: 'i' },
+                };
+
+                // Apply category filter if provided
+                if (category) {
+                    query.category = category;
+                }
+
+                // Apply brand filter if provided
+                if (brand) {
+                    query.brandName = brand;
+                }
+
+                // Apply price range filter if provided
+                if (priceRange) {
+                    const [minPrice, maxPrice] = priceRange.split('-').map(Number);
+                    if (maxPrice) {
+                        query.price = { $gte: minPrice, $lte: maxPrice };
+                    } else {
+                        query.price = { $gte: minPrice };
+                    }
+                }
                 const count = await productCollection.countDocuments(query);
                 res.send({ count });
             } catch (error) {
                 console.error('Error fetching product count:', error);
-                res.status(500).send({ error: 'Error fetching product count' });
+                res.status(500).send({ error: 'Failed to fetch product count' });
             }
         });
 
